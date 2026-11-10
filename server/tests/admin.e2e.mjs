@@ -1,0 +1,21 @@
+const B='http://localhost:5055/api'; let pass=0,fail=0; const ok=(c,m,x)=>{c?pass++:(fail++,console.log('FAIL',m,x!==undefined?JSON.stringify(x):''))};
+async function call(m,p,tok,body){const r=await fetch(B+p,{method:m,headers:{'content-type':'application/json',...(tok?{authorization:'Bearer '+tok}:{})},body:body?JSON.stringify(body):undefined});let j=null;try{j=await r.json()}catch{};return{s:r.status,j}}
+const hr=h=>new Date(Date.now()+h*36e5).toISOString();
+const A=(await call('POST','/auth/login',null,{email:'a@x.com',password:'adminpass1'})).j.token;
+const reg=async(n,role)=>{const r=(await call('POST','/auth/register',null,{name:n,email:n.toLowerCase()+'@x.com',password:'password1',role})).j; if(role==='organiser')await call('PATCH','/admin/organisers/'+r.user.id,A,{status:'approved'}); return r};
+const O1=await reg('Orga','organiser'), O2=await reg('Orgb','organiser'), U=await reg('Uone','attendee');
+const base={title:'T',description:'d',venue:'V',startsAt:hr(72),endsAt:hr(74),capacity:5,category:'Arts'};
+let ev=(await call('POST','/events',O1.token,base)).j;
+let r=await call('POST','/events',A,{...base,title:'By admin'}); ok(r.s===201,'admin creates event',r.j);
+r=await call('POST','/events',A,{...base,title:'Tiered by admin',tiers:[{name:'R',price:5,limit:3}]}); ok(r.s===201&&r.j.capacity===3,'admin creates tiered event');
+r=await call('PUT','/events/'+ev._id,A,{title:'Fixed by admin',venue:'New hall'}); ok(r.s===200&&r.j.title==='Fixed by admin'&&String(r.j.organiserId)===O1.user.id,'admin edits organiser event, owner unchanged',r.j);
+ok((await call('PUT','/events/'+ev._id,O2.token,{title:'hack'})).s===404,'other organiser still cannot edit');
+ok((await call('PUT','/events/'+ev._id,U.token,{title:'hack'})).s===403,'attendee cannot edit');
+await call('POST','/bookings/'+ev._id,U.token);
+let at=await call('GET','/events/'+ev._id+'/attendees',A); ok(at.s===200&&at.j.length===1,'admin sees attendees');
+ok((await call('GET','/events/'+ev._id+'/live',A)).s===200,'admin sees live counter');
+ok((await call('PATCH','/events/'+ev._id+'/checkin/'+at.j[0]._id,A,{})).s===200,'admin checks in');
+ok((await call('POST','/events/'+ev._id+'/announcements',A,{message:'Hello'})).s===201,'admin posts announcement');
+ok((await call('GET','/events/'+ev._id+'/attendees',O2.token)).s===404,'other organiser cannot see attendees');
+ok((await call('PATCH','/events/'+ev._id+'/cancel',A)).s===200,'admin cancels via events route');
+console.log(`passed ${pass}, failed ${fail}`);
