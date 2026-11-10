@@ -16,12 +16,10 @@ router.post('/register', async (req, res) => {
     if (!name || !email || typeof password !== 'string' || !password || !['attendee', 'organiser'].includes(role)) return res.status(400).json({ message: 'Complete all fields and select a valid role.' });
     if (password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters.' });
     if (await User.findOne({ email })) return res.status(409).json({ message: 'Email is already registered.' });
-    // Names must be unique, ignoring upper/lower case ("Admin" and "admin" count as the same name).
     if (await User.findOne({ name }).collation({ locale: 'en', strength: 2 })) return res.status(409).json({ message: 'That name is already taken. Please choose a different name.' });
     const user = await User.create({ name, email, passwordHash: await bcrypt.hash(password, 12), role, accountStatus: role === 'organiser' ? 'pending' : 'approved' });
     res.status(201).json({ token: makeToken(user._id), user: publicUser(user) });
   } catch (e) {
-    // Safety net: the database's unique indexes also reject duplicates if two people sign up at the same moment.
     if (e.code === 11000) return res.status(409).json({ message: e.keyPattern?.name ? 'That name is already taken. Please choose a different name.' : 'Email is already registered.' });
     res.status(500).json({ message: 'Could not create account.' });
   }
@@ -34,7 +32,6 @@ router.post('/login', asyncHandler(async (req, res) => {
   if (user.accountStatus === 'rejected') return res.status(403).json({ message: 'Your organiser account was not approved.' });
   res.json({ token: makeToken(user._id), user: publicUser(user) });
 }));
-// Attendees save the categories they like; "For You" uses them.
 router.put('/interests', protect, allow('attendee'), asyncHandler(async (req, res) => {
   const list = Array.isArray(req.body.interests) ? req.body.interests : [];
   const interests = [...new Set(list)];
@@ -42,7 +39,6 @@ router.put('/interests', protect, allow('attendee'), asyncHandler(async (req, re
   const user = await User.findByIdAndUpdate(req.user._id, { interests }, { new: true, runValidators: true });
   res.json({ message: 'Your interests have been saved.', user: publicUser(user) });
 }));
-// Change your own password.
 router.put('/password', protect, asyncHandler(async (req, res) => {
   if (req.user.role === 'admin') return res.status(403).json({ message: 'The admin password is set in server/.env.' });
   const { currentPassword, newPassword } = req.body;

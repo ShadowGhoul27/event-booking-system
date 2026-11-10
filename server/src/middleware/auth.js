@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-// Check if the user has a valid login token.
 export async function protect(req, res, next) {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -27,14 +26,12 @@ export async function protect(req, res, next) {
   }
 }
 
-// Check if the logged-in user has the correct role.
 export const allow = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({ message: "You do not have permission." });
     }
 
-    // Organisers must be approved by an admin before they can use organiser features.
     if (req.user.role === "organiser" && req.user.accountStatus !== "approved") {
       return res.status(403).json({ message: "Your organiser account is waiting for admin approval." });
     }
