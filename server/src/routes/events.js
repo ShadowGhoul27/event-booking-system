@@ -69,7 +69,7 @@ router.get('/mine/stats', protect, allow('organiser'), asyncHandler(async (req, 
   const daily = [];
   for (let i = 13; i >= 0; i--) { const d = fmt.format(new Date(Date.now() - i * 864e5)); daily.push({ date: d, count: map[d] || 0 }); }
   res.json({ totals, perEvent, daily });
-}));st.
+}));
 router.get('/recommended', protect, allow('attendee'), asyncHandler(async (req, res) => {
   const interests = req.user.interests || [];
   const wanted = new Set(interests.map(i => i.toLowerCase()));
